@@ -215,3 +215,48 @@ content = pp.Group(pp.Combine(pp.OneOrMore(stripped_whitespace | unstripped_whit
 program_chunk <<= (long_comment | comment | escaped_command | unrelated_escape | block_partial | block_command | partial | command | content).leave_whitespace()
 program <<= pp.ZeroOrMore(program_chunk)("program").leave_whitespace().set_name("program")
 grammar = (program + pp.StringEnd()).parse_with_tabs()
+
+
+
+
+
+
+#updated utility function
+def format_chat_template(input_text):
+    # Step 1: Identify and Format {{gen ... }} Commands
+    def format_gen_command(tokens):
+        return f"<assistant>{tokens[0]}</assistant>"
+
+    gen_command = pp.Group(pp.Suppress("{{gen") + pp.SkipTo("}}") + pp.Suppress("}}")).setParseAction(format_gen_command)
+
+    # Step 2: Wrap Remaining Text Segments with User Tags
+    def format_user_text(tokens):
+        return f"<user>{tokens[0]}</user>"
+
+    user_text = pp.Group(pp.OneOrMore(pp.CharsNotIn("{{gen"))).setParseAction(format_user_text)
+
+    # Step 3: Ensure the Template Ends with {{gen 'write' }} Command
+    template_end_command = "{{gen 'write'}}"
+
+    # Check if the input text ends with the write command, and add it if not
+    if not input_text.endswith(template_end_command):
+        input_text += template_end_command
+
+    # Define PyParsing grammar for chat templates
+    chat_template_parser = pp.OneOrMore(gen_command | user_text)
+
+    # Parse the input text
+    parsed_result = chat_template_parser.parseString(input_text)
+
+    # Return the formatted chat template
+    return ''.join(parsed_result)
+
+# Example usage:
+user_input = """
+Hello, this is user text.
+{{gen 'command1'}}
+More user text.
+{{gen 'command2'}}
+"""
+formatted_template = format_chat_template(user_input)
+print(formatted_template)
